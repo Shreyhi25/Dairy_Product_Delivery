@@ -3,22 +3,22 @@ from flask_login import login_required, current_user
 from backend.models.models import Product, CartItem, Order, OrderItem
 from backend.app import db
 
-user_bp = Blueprint('user', __name__, url_prefix='/user')
+bp = Blueprint('user', __name__, url_prefix='/user')
 
-@user_bp.route('/dashboard')
+@bp.route('/dashboard')
 @login_required
 def dashboard():
     products = Product.query.all()
     return render_template('user/dashboard.html', products=products)
 
-@user_bp.route('/cart')
+@bp.route('/cart')
 @login_required
 def cart():
     cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
     total = sum(item.product.price * item.quantity for item in cart_items)
     return render_template('user/cart.html', cart_items=cart_items, total=total)
 
-@user_bp.route('/cart/add/<int:product_id>', methods=['POST'])
+@bp.route('/add_to_cart/<int:product_id>', methods=['POST'])
 @login_required
 def add_to_cart(product_id):
     product = Product.query.get_or_404(product_id)
@@ -44,10 +44,10 @@ def add_to_cart(product_id):
         db.session.add(cart_item)
     
     db.session.commit()
-    flash('Product added to cart')
-    return redirect(url_for('user.cart'))
+    flash('Added to cart successfully')
+    return redirect(url_for('user.dashboard'))
 
-@user_bp.route('/cart/update/<int:cart_item_id>', methods=['POST'])
+@bp.route('/cart/update/<int:cart_item_id>', methods=['POST'])
 @login_required
 def update_cart(cart_item_id):
     cart_item = CartItem.query.get_or_404(cart_item_id)
@@ -70,7 +70,7 @@ def update_cart(cart_item_id):
     db.session.commit()
     return redirect(url_for('user.cart'))
 
-@user_bp.route('/cart/remove/<int:cart_item_id>', methods=['POST'])
+@bp.route('/cart/remove/<int:cart_item_id>', methods=['POST'])
 @login_required
 def remove_from_cart(cart_item_id):
     cart_item = CartItem.query.get_or_404(cart_item_id)
@@ -85,49 +85,43 @@ def remove_from_cart(cart_item_id):
     flash('Item removed from cart')
     return redirect(url_for('user.cart'))
 
-@user_bp.route('/checkout', methods=['GET', 'POST'])
+@bp.route('/checkout', methods=['POST'])
 @login_required
 def checkout():
     cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
-    
     if not cart_items:
         flash('Your cart is empty')
         return redirect(url_for('user.cart'))
     
-    if request.method == 'POST':
-        # Create new order
-        total_amount = sum(item.product.price * item.quantity for item in cart_items)
-        order = Order(user_id=current_user.id, total_amount=total_amount)
-        db.session.add(order)
-        
-        # Create order items and update stock
-        for cart_item in cart_items:
-            if cart_item.quantity > cart_item.product.stock:
-                flash('Not enough stock available for some items')
-                return redirect(url_for('user.cart'))
-            
-            order_item = OrderItem(
-                order=order,
-                product_id=cart_item.product_id,
-                quantity=cart_item.quantity,
-                price_at_time=cart_item.product.price
-            )
-            db.session.add(order_item)
-            
-            # Update product stock
-            cart_item.product.stock -= cart_item.quantity
-            
-            # Remove cart item
-            db.session.delete(cart_item)
-        
-        db.session.commit()
-        flash('Order placed successfully')
-        return redirect(url_for('user.orders'))
+    total_amount = sum(item.product.price * item.quantity for item in cart_items)
     
-    total = sum(item.product.price * item.quantity for item in cart_items)
-    return render_template('user/checkout.html', cart_items=cart_items, total=total)
+    # Create order
+    order = Order(user_id=current_user.id, total_amount=total_amount)
+    db.session.add(order)
+    
+    # Create order items and update stock
+    for cart_item in cart_items:
+        if cart_item.quantity > cart_item.product.stock:
+            flash(f'Not enough stock for {cart_item.product.name}')
+            return redirect(url_for('user.cart'))
+        
+        order_item = OrderItem(
+            order_id=order.id,
+            product_id=cart_item.product_id,
+            quantity=cart_item.quantity,
+            price=cart_item.product.price
+        )
+        cart_item.product.stock -= cart_item.quantity
+        db.session.add(order_item)
+    
+    # Clear cart
+    CartItem.query.filter_by(user_id=current_user.id).delete()
+    
+    db.session.commit()
+    flash('Order placed successfully')
+    return redirect(url_for('user.orders'))
 
-@user_bp.route('/orders')
+@bp.route('/orders')
 @login_required
 def orders():
     orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
