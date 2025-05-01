@@ -21,15 +21,38 @@ def admin_required(f):
 @login_required
 @admin_required
 def dashboard():
+    # Get basic statistics
     total_users = User.query.filter_by(is_admin=False).count()
     total_orders = Order.query.count()
     total_products = Product.query.count()
+    
+    # Calculate total sales (sum of completed orders)
+    total_sales = db.session.query(func.sum(Order.total_amount))\
+        .filter(Order.status == 'completed')\
+        .scalar() or 0.0
+    
+    # Get recent orders
     recent_orders = Order.query.order_by(Order.created_at.desc()).limit(5).all()
+    
+    # Get sales data for the last 7 days
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    daily_sales = db.session.query(
+        func.date(Order.created_at).label('date'),
+        func.sum(Order.total_amount).label('total')
+    ).filter(
+        Order.created_at >= seven_days_ago,
+        Order.status == 'completed'
+    ).group_by(
+        func.date(Order.created_at)
+    ).all()
+    
     return render_template('admin/dashboard.html',
                          total_users=total_users,
                          total_orders=total_orders,
                          total_products=total_products,
-                         recent_orders=recent_orders)
+                         total_sales=total_sales,
+                         recent_orders=recent_orders,
+                         daily_sales=daily_sales)
 
 @bp.route('/products')
 @login_required

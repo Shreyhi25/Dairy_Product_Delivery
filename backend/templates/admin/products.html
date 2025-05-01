@@ -39,7 +39,7 @@
                 <td>{{ product.stock }}</td>
                 <td>
                     <div class="btn-group">
-                        <a href="{{ url_for('admin.edit_product', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        <a href="{{ url_for('admin.edit_product', id=product.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                         <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ product.id }}">
                             Delete
                         </button>
@@ -58,7 +58,7 @@
                                 </div>
                                 <div class="modal-footer">
                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <form method="POST" action="{{ url_for('admin.delete_product', product_id=product.id) }}" class="d-inline">
+                                    <form method="POST" action="{{ url_for('admin.delete_product', id=product.id) }}" class="d-inline">
                                         <button type="submit" class="btn btn-danger">Delete</button>
                                     </form>
                                 </div>
