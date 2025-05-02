@@ -60,9 +60,9 @@ flask run
 The application will be available at `http://localhost:5000`
 
 ## Default Admin Credentials
-- Email: admin@dairy.com
+- Email: admin@example.com
 - Password: admin123
-
+- 
 ## Project Structure
 ```
 dairy_delivery/
