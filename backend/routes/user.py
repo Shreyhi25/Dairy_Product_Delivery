@@ -85,7 +85,7 @@ def remove_from_cart(cart_item_id):
     flash('Item removed from cart')
     return redirect(url_for('user.cart'))
 
-@bp.route('/checkout', methods=['POST'])
+@bp.route('/checkout', methods=['GET', 'POST'])
 @login_required
 def checkout():
     cart_items = CartItem.query.filter_by(user_id=current_user.id).all()
@@ -95,31 +95,46 @@ def checkout():
     
     total_amount = sum(item.product.price * item.quantity for item in cart_items)
     
-    # Create order
-    order = Order(user_id=current_user.id, total_amount=total_amount)
-    db.session.add(order)
+    if request.method == 'GET':
+        return render_template('user/checkout.html', 
+                             cart_items=cart_items, 
+                             total_amount=total_amount)
     
-    # Create order items and update stock
-    for cart_item in cart_items:
-        if cart_item.quantity > cart_item.product.stock:
-            flash(f'Not enough stock for {cart_item.product.name}')
-            return redirect(url_for('user.cart'))
+    # Handle POST request
+    try:
+        # Create order
+        order = Order(user_id=current_user.id, total_amount=total_amount)
+        db.session.add(order)
+        db.session.flush()  # Get the order ID without committing
         
-        order_item = OrderItem(
-            order_id=order.id,
-            product_id=cart_item.product_id,
-            quantity=cart_item.quantity,
-            price=cart_item.product.price
-        )
-        cart_item.product.stock -= cart_item.quantity
-        db.session.add(order_item)
-    
-    # Clear cart
-    CartItem.query.filter_by(user_id=current_user.id).delete()
-    
-    db.session.commit()
-    flash('Order placed successfully')
-    return redirect(url_for('user.orders'))
+        # Create order items and update stock
+        for cart_item in cart_items:
+            if cart_item.quantity > cart_item.product.stock:
+                db.session.rollback()
+                flash(f'Not enough stock for {cart_item.product.name}')
+                return redirect(url_for('user.cart'))
+            
+            order_item = OrderItem(
+                order_id=order.id,  # Now order.id is available
+                product_id=cart_item.product_id,
+                quantity=cart_item.quantity,
+                price=cart_item.product.price
+            )
+            cart_item.product.stock -= cart_item.quantity
+            db.session.add(order_item)
+        
+        # Clear cart
+        CartItem.query.filter_by(user_id=current_user.id).delete()
+        
+        # Commit all changes
+        db.session.commit()
+        flash('Order placed successfully')
+        return redirect(url_for('user.orders'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while processing your order. Please try again.')
+        return redirect(url_for('user.cart'))
 
 @bp.route('/orders')
 @login_required

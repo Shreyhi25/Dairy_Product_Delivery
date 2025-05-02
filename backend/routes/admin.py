@@ -112,25 +112,36 @@ def users():
     users = User.query.filter_by(is_admin=False).all()
     return render_template('admin/users.html', users=users)
 
-@bp.route('/users/delete/<int:id>', methods=['POST'])
+@bp.route('/users/<int:id>/delete', methods=['POST'])
 @login_required
 @admin_required
 def delete_user(id):
     user = User.query.get_or_404(id)
     if user.is_admin:
-        flash('Cannot delete admin user')
+        flash('Cannot delete admin user.', 'danger')
         return redirect(url_for('admin.users'))
     
-    # Delete associated orders and order items (cascade)
-    Order.query.filter_by(user_id=user.id).delete()
+    try:
+        # First delete all order items associated with the user's orders
+        orders = Order.query.filter_by(user_id=user.id).all()
+        for order in orders:
+            OrderItem.query.filter_by(order_id=order.id).delete()
+        
+        # Then delete the orders
+        Order.query.filter_by(user_id=user.id).delete()
+        
+        # Delete cart items
+        CartItem.query.filter_by(user_id=user.id).delete()
+        
+        # Finally delete the user
+        db.session.delete(user)
+        db.session.commit()
+        flash('User deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error deleting user. Please try again.', 'danger')
+        print(f"Error deleting user: {str(e)}")
     
-    # Delete cart items
-    CartItem.query.filter_by(user_id=user.id).delete()
-    
-    # Delete user
-    db.session.delete(user)
-    db.session.commit()
-    flash('User deleted successfully')
     return redirect(url_for('admin.users'))
 
 @bp.route('/orders')
