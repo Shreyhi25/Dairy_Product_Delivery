@@ -150,4 +150,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Flask Documentation
 - Bootstrap Documentation
-- SQLAlchemy Documentation 
+- SQLAlchemy Documentation
